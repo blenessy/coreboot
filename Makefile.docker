@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Unlicense
+
+# TODO: change the image name
+DOCKER_IMAGE_NAME := coreboot-builder-bullseye
+
+# TODO: change the Dockerfile contents
+define DOCKERFILE
+	FROM debian:11-slim
+
+	# https://doc.coreboot.org/tutorial/part1.html#download-configure-and-build-coreboot
+	RUN apt-get update \
+		&& apt-get install -y --no-install-recommends \
+			bison build-essential curl flex git gnat libncurses5-dev m4 zlib1g-dev \
+			ca-certificates python2 python-is-python2 \
+		&& rm -rf /var/lib/apt/lists/*
+endef
+export DOCKERFILE
+
+define docker_build_and_run
+	echo "$$DOCKERFILE" | docker build --tag $(DOCKER_IMAGE_NAME) -
+	docker run --rm --tty --interactive \
+		--mount 'type=bind,source=$(shell pwd),target=/build' --workdir /build \
+		--user '$(shell id -u):$(shell id -g)' $(1) $(DOCKER_IMAGE_NAME) $(2)
+endef
+
+ifeq ($(MAKECMDGOALS),interactive)
+
+.PHONY: interactive
+interactive:
+	$(call docker_build_and_run,--name $(DOCKER_IMAGE_NAME),)
+
+else # ifeq ($(MAKECMDGOALS),interactive)
+
+all:
+%:
+	$(call docker_build_and_run,,make $(MAKEFLAGS) $@)
+
+endif # ifeq ($(MAKECMDGOALS),interactive)
